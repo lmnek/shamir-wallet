@@ -1,44 +1,27 @@
-<!-- YOU CAN DELETE EVERYTHING IN THIS PAGE -->
+<script lang="ts">
+    import { invoke } from '@tauri-apps/api';
+    
+    let words = "";
+
+    async function handleClick() {
+        words = await invoke("cw")
+    }
+</script>
 
 <div class="container h-full mx-auto flex justify-center items-center">
 	<div class="space-y-10 text-center flex flex-col items-center">
-		<h2 class="h2">Welcome to Skeleton.</h2>
-		<!-- Animated Logo -->
-		<figure>
-			<section class="img-bg" />
-			<svg
-				class="fill-token -scale-x-[100%]"
-				xmlns="http://www.w3.org/2000/svg"
-				viewBox="0 0 200 200"
-			>
-			</svg>
-		</figure>
-		<!-- / -->
-		<div class="flex justify-center space-x-2">
-			<a
-				class="btn variant-filled"
-				href="https://skeleton.dev/"
-				target="_blank"
-				rel="noreferrer"
-			>
-				Launch Documentation
-			</a>
-		</div>
-		<div class="space-y-2">
-			<p>Try editing the following:</p>
-			<p><code class="code">/src/routes/+layout.svelte</code></p>
-			<p><code class="code">/src/routes/+page.svelte</code></p>
-		</div>
+		<h2 class="h2">Welcome to Shamir.</h2>
+        <button class="btn variant-filled" on:click={handleClick}>
+            Create wallet
+        </button>
+        <p>{words}</p>
+
 	</div>
 </div>
 
 <style lang="postcss">
 	figure {
 		@apply flex relative flex-col;
-	}
-	figure svg,
-	.img-bg {
-		@apply w-64 h-64 md:w-80 md:h-80;
 	}
 	.img-bg {
 		@apply absolute z-[-1] rounded-full blur-[50px] transition-all;
