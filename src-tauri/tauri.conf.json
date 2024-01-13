@@ -73,12 +73,21 @@
                     "longDescription": null,
                     "args": [
                         {
-                            "name": "wallet_name",
+                            "name": "name",
+                            "short": "n",
                             "description": "Identification of wallet",
                             "longDescription": null,
                             "multipleOccurrences": false,
                             "required": true,
                             "takesValue": true
+                        },
+                        {
+                            "name": "create_address",
+                            "short": "a"
+                        },
+                        {
+                            "name": "list_address",
+                            "short": "l"
                         }
                     ]
                 }
@@ -92,7 +101,8 @@
                 {
                     "name": "create_wallet",
                     "short": "c",
-                    "description": "Create new wallet"
+                    "description": "Create new wallet of name",
+                    "takesValue": true
                 }
             ]
         }

@@ -1,54 +1,118 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::process::exit;
-use bdk::bitcoin::Network;
-use bdk::database::MemoryDatabase;
-use bdk::keys::{
-    bip39::{Language, Mnemonic, WordCount},
-    DerivableKey, ExtendedKey, GeneratableKey, GeneratedKey,
-};
-use bdk::template::Bip84;
-use bdk::{miniscript, KeychainKind, Wallet};
+mod db;
+mod wallet;
+
+use bdk::SyncOptions;
+use bdk::blockchain::ElectrumBlockchain;
+use bdk::electrum_client::Client;
+use db::retrieve_wallet;
+use std::env::set_var;
+use std::process::ExitCode;
 use tauri;
+use crate::db::save_wallet;
+use crate::wallet::create_wallet;
+use rpassword::prompt_password;
 
-fn main() {
+fn main() -> ExitCode {
+    set_var("RUST_BACKTRACE", "1");
+
     let context = tauri::generate_context!();
-    handle_onetime_cli(&context);
-
-//    let (_wallet, _mnemonic_words) = create_wallet();
+    if let Some(exit_code) = handle_onetime_cli(&context) {
+        return ExitCode::from(exit_code);
+    };
 
     tauri::Builder::default()
-        .setup(|app| { handle_cli(app); Ok(()) })
+        .setup(|app| {
+            handle_cli(app);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![cw])
         .run(context)
         .expect("error while running tauri application");
+    ExitCode::from(0)
 }
 
-fn handle_onetime_cli(context: &tauri::Context<tauri::utils::assets::EmbeddedAssets>) {
-    let matches = tauri::api::cli::get_matches( 
-        &context.config().tauri.cli.clone().unwrap(), 
-        context.package_info());
+fn handle_onetime_cli(
+    context: &tauri::Context<tauri::utils::assets::EmbeddedAssets>,
+) -> Option<u8> {
+    let matches = tauri::api::cli::get_matches(
+        &context.config().tauri.cli.clone().unwrap(),
+        context.package_info(),
+    );
 
     // CLI for one-time actions
     match matches {
         Err(err) => {
             println!("CLI error: {}", err);
-            exit(-1)
+            return Some(101);
         }
         Ok(matches) => {
-            if matches.args.iter()
-                .find(|(name, _)| { name.to_string() == "create_wallet" })
-                .map_or(false, |(_, arg)| arg.occurrences >= 1) {
+            if let Some(arg) = matches.args.get("create_wallet") {
+                if arg.occurrences >= 1 {
+                    let name: &String = &arg
+                        .value
+                        .to_string()
+                        .chars()
+                        .filter(|c| *c != '"')
+                        .collect();
 
-                println!("Created new wallet: kfjdlsakjflkdsajlkfj");
-                exit(0)
+                    let  password = prompt_password("Set password: ").unwrap();
+
+                    //TODO: password load
+                    let (wallet, mnemonic_words) = create_wallet(name, &password);
+
+                    save_wallet(name, &password, &wallet).unwrap();
+
+                    println!("Created new wallet: {}", mnemonic_words);
+
+                    let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
+                    let blockchain = ElectrumBlockchain::from(client);
+                    wallet.sync(&blockchain, SyncOptions::default()).unwrap();
+
+                    println!("Balance: {}", wallet.get_balance().unwrap().get_total());
+
+                    return Some(0);
+                }
             }
-            if let Some(_subcommand) = matches.subcommand { 
-                println!("TODO: handle onetime subcommands")
+
+            // NOTE: only for testing so far
+            if let Some(arg) = matches.args.get("verbose") {
+                if arg.occurrences >= 1 {
+                    let _ = retrieve_wallet(&"wallet1".to_owned(), &"123".to_owned()).unwrap();
+                    return Some(0);
+                }
+            }
+
+            if let Some(ref subcommand) = matches.subcommand {
+                if subcommand.name == "wallet" {
+                    let wallet_name: String = subcommand.matches.args
+                        .get("name").unwrap().value
+                        .to_string()
+                        .chars()
+                        .filter(|c| *c != '"')
+                        .collect();
+                    let password = prompt_password("Enter password: ").unwrap();
+                    let wallet = retrieve_wallet(&wallet_name, &password).unwrap();
+
+                    if let Some(arg) = subcommand.matches.args.get("create_address") {
+                        if arg.occurrences >= 1 {
+                            let address = wallet.get_address(bdk::wallet::AddressIndex::New);
+                            dbg!(address);
+                            return Some(0);
+                        }
+                    }
+                    if let Some(arg) = subcommand.matches.args.get("list_addresses") {
+                        if arg.occurrences >= 1 {
+                            //wallet.database().get_raw_tx
+                        }
+                    }
+                }
             }
         }
     }
+    return None;
 }
 
 fn handle_cli(app: &mut tauri::App) {
@@ -58,48 +122,8 @@ fn handle_cli(app: &mut tauri::App) {
 }
 
 #[tauri::command]
-fn cw() -> String {
-    let (_wallet, mnemonic_words) = create_wallet();
-    return mnemonic_words
+fn cw(name: String, password: String) -> String {
+    let password_hash = "todo";
+    //let (_wallet, mnemonic_words) = create_wallet(&name, &password_hash);
+    return "dfa".to_string(); //mnemonic_words
 }
-
-// can be offline
-fn create_wallet() -> (Wallet<MemoryDatabase>, String) {
-    let network = Network::Testnet;
-
-    // Generate fresh mnemonic
-    let mnemonic: GeneratedKey<_, miniscript::Segwitv0> =
-        Mnemonic::generate((WordCount::Words12, Language::English)).unwrap();
-    // Convert mnemonic to string
-    let mnemonic_words = mnemonic.to_string();
-    // Parse a mnemonic
-    let mnemonic = Mnemonic::parse(&mnemonic_words).unwrap();
-    // Generate the extended key
-    let xkey: ExtendedKey = mnemonic.into_extended_key().unwrap();
-    // Get xprv from the extended key
-    let xprv = xkey.into_xprv(network).unwrap();
-
-    // Create a BDK wallet structure using BIP 84 descriptor ("m/84h/1h/0h/0" and "m/84h/1h/0h/1")
-    let wallet = Wallet::new(
-        Bip84(xprv, KeychainKind::External),
-        Some(Bip84(xprv, KeychainKind::Internal)),
-        network,
-        MemoryDatabase::default(),
-    )
-    .unwrap();
-
-    println!(
-        "mnemonic: {}\n\nrecv desc (pub key): {:#?}\n\nchng desc (pub key): {:#?}",
-        mnemonic_words,
-        wallet
-            .get_descriptor_for_keychain(KeychainKind::External)
-            .to_string(),
-        wallet
-            .get_descriptor_for_keychain(KeychainKind::Internal)
-            .to_string()
-    );
-
-    (wallet, mnemonic_words)
-}
-
-fn _shamir_into_shares(_mnemonic: String) {}
