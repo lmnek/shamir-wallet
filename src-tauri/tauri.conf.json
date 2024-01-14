@@ -82,26 +82,58 @@
                             "takesValue": true
                         },
                         {
-                            "name": "create_address",
+                            "name": "address",
+                            "description": "Return last unused address",
                             "short": "a"
                         },
                         {
-                            "name": "list_address",
+                            "name": "list_addresses",
                             "short": "l"
+                        },
+                        {
+                            "name": "transactions",
+                            "short": "t"
+                        },
+                        {
+                            "name": "balance",
+                            "short": "b"
+                        },
+                        {
+                            "name": "sync",
+                            "short": "s"
                         }
-                    ]
+                    ],
+                    "subcommands": {
+                        "send": {
+                            "description": "Create transaction and broadcast it",
+                            "args": [
+                                {
+                                    "name": "recipient",
+                                    "short": "r", 
+                                    "required": true,
+                                    "takesValue": true
+                                },
+                                {
+                                    "name": "amount",
+                                    "short": "a", 
+                                    "required": true,
+                                    "takesValue": true
+                                }
+                            ]
+                        }
+                    }
                 }
             },
             "args": [
                 {
                     "name": "verbose",
                     "short": "v",
-                    "description": "Verbose mode"
+                    "description": "Verbose mode (does nothing lol)"
                 },
                 {
-                    "name": "create_wallet",
-                    "short": "c",
-                    "description": "Create new wallet of name",
+                    "name": "wallet",
+                    "short": "w",
+                    "description": "Create new wallet of given name",
                     "takesValue": true
                 }
             ]

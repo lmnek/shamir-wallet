@@ -1,7 +1,7 @@
 // Sled DB functions
-use crate::wallet::{initialize_wallet_strings, Wall};
+
+use crate::wallet::{initialize_wallet_strings, MyWallet};
 use anyhow::anyhow;
-use bdk::KeychainKind;
 use orion::{aead, kdf, pwhash, util};
 use sled::Db;
 use tauri::api::path;
@@ -13,7 +13,7 @@ fn sled_db() -> Db {
 }
 
 // PERF: async / look at bottlenecks
-pub fn save_wallet(name: &String, password: &String, wallet: &Wall) -> anyhow::Result<()> {
+pub fn save_wallet(name: &String, password: &String, wallet: &MyWallet) -> anyhow::Result<()> {
     let db = sled_db();
     let tree = db.open_tree(name)?;
 
@@ -21,12 +21,7 @@ pub fn save_wallet(name: &String, password: &String, wallet: &Wall) -> anyhow::R
     let passw_hash = pwhash::hash_password(&passw, 3, 1 << 16)?;
     tree.insert(b"password_hash", passw_hash.unprotected_as_encoded())?;
 
-    let desc = wallet
-        .get_descriptor_for_keychain(KeychainKind::External)
-        .to_string();
-    let change_desc = wallet
-        .get_descriptor_for_keychain(KeychainKind::Internal)
-        .to_string();
+    let (desc, change_desc) = wallet.get_descritors();
 
     let mut salt_bytes = [0u8; 64];
     util::secure_rand_bytes(&mut salt_bytes)?;
@@ -43,7 +38,7 @@ pub fn save_wallet(name: &String, password: &String, wallet: &Wall) -> anyhow::R
     Ok(())
 }
 
-pub fn retrieve_wallet(name: &String, password: &String) -> anyhow::Result<Wall> {
+pub fn retrieve_wallet(name: &String, password: &String) -> anyhow::Result<MyWallet> {
     let db = sled_db();
     let tree = db.open_tree(name)?;
 
