@@ -1,5 +1,7 @@
-use crate::db::retrieve_wallet;
+use crate::db;
 use crate::wallet::create_wallet;
+use crate::wallet::WalletInterface;
+use bdk::KeychainKind;
 use rpassword::prompt_password;
 use tauri::api::cli::Matches;
 
@@ -18,12 +20,33 @@ pub fn handle_onetime_cli(
             return Some(101);
         }
         Ok(matches) => {
-            if let Some(name) = get_value(&matches, "wallet") {
-                let password = prompt_password("Set password: ").unwrap();
-                let (_wallet, mnemonic_words) = create_wallet(&name, &password);
-                println!("Created new wallet: {}", mnemonic_words);
+            if contains(&matches, "list") {
+                println!("Printing wallet names: ");
+                for name in db::get_wallet_names().unwrap().iter() {
+                    println!("- {}", name);
+                }
                 return Some(0);
             }
+
+            if let Some(name) = get_value(&matches, "new_wallet") {
+                let password = prompt_password("Set password: ").unwrap();
+
+                 match create_wallet(name, password) {
+                    Ok((_wallet, mnemonic_words)) => {
+                        println!("Created new wallet: {}", mnemonic_words);
+                        return Some(0);
+                    } 
+                    Err(err) => {
+                        println!("Error: {}", err);
+                        return Some(101);
+                    }
+                };
+            }
+
+            if let Some(_name) = get_value(&matches, "recover_wallet") {
+                //TODO:
+                todo!("recover");
+            }   
 
             if let Some(ref subcommand) = matches.subcommand {
                 if subcommand.name == "wallet" {
@@ -38,7 +61,7 @@ pub fn handle_onetime_cli(
                             return Some(101);
                         }
                     };
-                    let wallet = match retrieve_wallet(&wallet_name, &password) {
+                    let wallet = match db::retrieve_wallet(&wallet_name, &password) {
                         Ok(w) => w,
                         Err(err) => {
                             eprintln!("Error while retrieving wallet: {}", err);
@@ -50,7 +73,7 @@ pub fn handle_onetime_cli(
 
                     if contains(ms, "sync") {
                         println!("Synchronizing blockchain...");
-                        wallet.sync();
+                        wallet.synchronize();
                         println!("-> finished");
                     }
                     if contains(ms, "balance") {
@@ -58,7 +81,7 @@ pub fn handle_onetime_cli(
                         println!("Balance: {} sats", balance)
                     }
                     if contains(ms, "address") {
-                        let address = wallet.last_unusued_address().unwrap();
+                        let address = wallet.last_used_address().unwrap();
                         println!("New address: {}", address.to_string());
                     }
                     if contains(ms, "transactions") {
@@ -73,13 +96,22 @@ pub fn handle_onetime_cli(
                         if subcommand.name == "send" {
                             let ms2 = &subcommand.matches;
                             let send_to = get_value(ms2, "recipient").unwrap();
-                            let amount = get_value(ms2, "amount").unwrap();
+                            let amount = get_value(ms2, "amount").unwrap().parse::<u64>().unwrap();
 
                             println!("{} {}", send_to, amount);
-
-                            wallet.send(send_to, amount.parse::<u64>().unwrap());
+                            println!("signer count {}", wallet.get_signers(KeychainKind::External).signers().len());
+                            wallet.send(send_to, amount);
                         }
                     }
+
+                    if contains(ms, "delete") {
+                        match db::delete_wallet(wallet_name) {
+                            Ok(true) => println!("Wallet was deleted"),
+                            Ok(false) => println!("Wallet deletion failed"),
+                            Err(err) => println!("Error when deleting wallet: {}", err.to_string()),
+                        };
+                    }
+
                     return Some(0);
                 }
             }

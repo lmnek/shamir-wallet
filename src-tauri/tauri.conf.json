@@ -101,6 +101,10 @@
                         {
                             "name": "sync",
                             "short": "s"
+                        },
+                        {
+                            "name": "delete",
+                            "short": "d"
                         }
                     ],
                     "subcommands": {
@@ -131,10 +135,18 @@
                     "description": "Verbose mode (does nothing lol)"
                 },
                 {
-                    "name": "wallet",
-                    "short": "w",
+                    "name": "new_wallet",
+                    "short": "n",
                     "description": "Create new wallet of given name",
                     "takesValue": true
+                },
+                {
+                    "name": "recover_wallet",
+                    "short": "r"
+                },
+                {
+                    "name": "list",
+                    "short": "l"
                 }
             ]
         }
