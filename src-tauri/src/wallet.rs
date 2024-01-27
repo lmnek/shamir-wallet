@@ -19,7 +19,6 @@ use bdk::{
 use bdk::{miniscript, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
 use tauri::api::path;
 use core::f32;
-use std::path::Path;
 use std::str::FromStr;
 use anyhow::{Result, anyhow};
 
@@ -69,7 +68,7 @@ pub fn _recover_wallet(recovery_phrase: String) {
 fn _shamir_into_shares(_mnemonic: String) {}
 
 pub trait WalletInterface {
-    fn get_balance(&self) -> anyhow::Result<u64>;
+    fn get_total_balance(&self) -> anyhow::Result<u64>;
     fn synchronize(&self);
     fn last_used_address(&self) -> anyhow::Result<Address>;
     fn create_tx(
@@ -86,7 +85,7 @@ pub trait WalletInterface {
 }
 
 impl WalletInterface for MyWallet {
-    fn get_balance(&self) -> anyhow::Result<u64> {
+    fn get_total_balance(&self) -> anyhow::Result<u64> {
         let balance = self.get_balance()?;
         Ok(balance.get_total())
     }
@@ -179,7 +178,8 @@ fn get_db(name: String) -> SqliteDatabase {
 }
 
 pub fn delete_wallet_db(name: &String) -> anyhow::Result<()>{
-    let db_path: &Path = Path::new(&name);
+    let data_path = path::data_dir().unwrap();
+    let db_path = data_path.join("shamir_wallet").join(format!("{}.sqlite", name));
     std::fs::remove_file(db_path)?;
     Ok(())
 }

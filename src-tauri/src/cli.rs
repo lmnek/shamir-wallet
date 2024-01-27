@@ -77,7 +77,7 @@ pub fn handle_onetime_cli(
                         println!("-> finished");
                     }
                     if contains(ms, "balance") {
-                        let balance = wallet.get_balance().unwrap();
+                        let balance = wallet.get_total_balance().unwrap();
                         println!("Balance: {} sats", balance)
                     }
                     if contains(ms, "address") {
