@@ -1,4 +1,5 @@
 use crate::db;
+use crate::shamir;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 use bdk::bitcoin::{Network, Transaction};
@@ -28,20 +29,24 @@ pub type MyWallet = Wallet<SqliteDatabase>;
 
 pub fn create_wallet(name: String, password: String) -> Result<(MyWallet, String)> {
     if db::get_wallet_names()?.contains(&name) {
-        return Err(anyhow!("Wallet name already exists"));
+        return Err(anyhow!("Wallet with this name already exists"));
     };
 
     let mnemonic: GeneratedKey<_, miniscript::Segwitv0> =
         Mnemonic::generate((WordCount::Words12, Language::English)).unwrap();
-    let mnemonic_words = mnemonic.to_string();
-    let mnemonic = Mnemonic::parse(&mnemonic_words).unwrap();
-    let xkey: ExtendedKey = mnemonic.into_extended_key().unwrap();
-    let xprv: ExtendedPrivKey = xkey.into_xprv(NETWORK).unwrap();
+    let mnemonic = mnemonic.to_string();
+    let xprv = xprv_from_mnemonic(&mnemonic);
     let wallet = init_wallet(&name, xprv);
 
     // NOTE: saving encrypted private key to DB, possibly dangerous
     db::save_private_key(&name, &password, xprv).unwrap();
-    Ok((wallet, mnemonic_words))
+    Ok((wallet, mnemonic))
+}
+
+pub fn xprv_from_mnemonic(mnemonic: &String) -> ExtendedPrivKey {
+    let mnemonic = Mnemonic::parse(mnemonic).unwrap();
+    let xkey: ExtendedKey = mnemonic.into_extended_key().unwrap();
+    xkey.into_xprv(NETWORK).unwrap()
 }
 
 pub fn init_wallet(
@@ -58,14 +63,19 @@ pub fn init_wallet(
 }
 
 
-// TODO:
-pub fn _recover_wallet(recovery_phrase: String) {
-    let _mnemonic = Mnemonic::from_str(&recovery_phrase);
-    todo!()
+pub fn recover_wallet(name: String, password: String, mnemonic: String) -> Result<MyWallet> {
+    let xprv = xprv_from_mnemonic(&mnemonic);
+    let wallet = init_wallet(&name, xprv);
+    db::save_private_key(&name, &password, xprv).unwrap();
+    Ok(wallet)
 }
 
-// TODO:
-fn _shamir_into_shares(_mnemonic: String) {}
+pub fn recover_wallet_shamir(name: String, password: String, mnemonics: Vec<Vec<String>>) -> Result<MyWallet> {
+    let xprv = shamir::combine(mnemonics);
+    let wallet = init_wallet(&name, xprv);
+    db::save_private_key(&name, &password, xprv).unwrap();
+    Ok(wallet)
+}
 
 pub trait WalletInterface {
     fn get_total_balance(&self) -> anyhow::Result<u64>;
@@ -91,12 +101,10 @@ impl WalletInterface for MyWallet {
     }
 
     fn synchronize(&self) {
-        // NOTE: syncoptions - progress
+        // NOTE: SyncOptions - progress
         let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
         let blockchain = ElectrumBlockchain::from(client);
         self.sync(&blockchain, SyncOptions::default()).unwrap();
-        // HACK: deal with blockchain
-        //self.blockchain = Some(blockchain);
     }
 
     fn last_used_address(&self) -> anyhow::Result<Address> {
@@ -114,18 +122,14 @@ impl WalletInterface for MyWallet {
         // psbt = partially signed transaction
         let (psbt, details) = {
             let mut builder = self.build_tx();
+            // TODO: custom fee_rate
             builder
                 .add_recipient(dest_script, amount)
                 .enable_rbf();
-                //.include_output_redeem_witness_script()
                 //.do_not_spend_change();
-            //.fee_rate(FeeRate::from_sat_per_vb(fee_rate));
+                //.fee_rate(FeeRate::from_sat_per_vb(fee_rate));
             builder.finish().unwrap()
         };
-
-        println!("Transaction details: {:#?}", details);
-        println!("Unsigned PSBT: {}", &psbt);
-
         (psbt, details)
     }
 

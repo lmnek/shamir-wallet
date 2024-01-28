@@ -4,6 +4,7 @@
 mod cli;
 mod db;
 mod wallet;
+mod shamir;
 
 use cli::{handle_gui_cli, handle_onetime_cli};
 use serde::Serialize;
@@ -11,7 +12,7 @@ use std::env::set_var;
 use std::process::ExitCode;
 use std::sync::Mutex;
 use tauri::{self, Manager, State};
-use wallet::{create_wallet, MyWallet, WalletInterface};
+use wallet::{create_wallet, recover_wallet, recover_wallet_shamir, xprv_from_mnemonic, MyWallet, WalletInterface};
 
 fn main() -> ExitCode {
     set_var("RUST_BACKTRACE", "1"); //NOTE: remove for production
@@ -32,6 +33,9 @@ fn main() -> ExitCode {
         .invoke_handler(tauri::generate_handler![
             load_wallet,
             cw,
+            cw_shamir,
+            rw,
+            rw_shamir,
             get_wallet_names,
             get_wallet_data,
             close_wallet,
@@ -44,13 +48,27 @@ fn main() -> ExitCode {
 
 type StateContent = Mutex<Vec<(String, Mutex<MyWallet>)>>;
 
+// Create wallet and return mnemonic
 #[tauri::command]
 fn cw(name: String, password: String, state: State<StateContent>) -> Result<String, String> {
     match create_wallet(name.clone(), password) {
         Ok((wallet, mnemonic_words)) => {
-            let mut wallets = state.lock().unwrap();
-            wallets.push((name, Mutex::new(wallet)));
+            add_wallet_state(name, wallet, state);
             Ok(mnemonic_words)
+        }
+        Err(err) => Err(err.to_string()),
+    }
+}
+
+#[tauri::command]
+fn cw_shamir(name: String, password: String, treshold: u8, count: u8, state: State<StateContent>) -> Result<Vec<Vec<String>>, String> {
+    match create_wallet(name.clone(), password) {
+        Ok((wallet, mnemonic)) => {
+            let xprv = xprv_from_mnemonic(&mnemonic);
+            let shamir_mnemonic_shares = shamir::split(xprv, treshold, count).unwrap();
+
+            add_wallet_state(name, wallet, state);
+            Ok(shamir_mnemonic_shares)
         }
         Err(err) => Err(err.to_string()),
     }
@@ -60,8 +78,30 @@ fn cw(name: String, password: String, state: State<StateContent>) -> Result<Stri
 fn load_wallet(name: String, password: String, state: State<StateContent>) -> Result<(), String> {
     match db::retrieve_wallet(&name, &password) {
         Ok(wallet) => {
-            let mut wallets = state.lock().unwrap();
-            wallets.push((name, Mutex::new(wallet)));
+            add_wallet_state(name, wallet, state);
+            Ok(())
+        }
+        Err(err) => Err(err.to_string()),
+    }
+}
+
+// Retrive wallet from mnemonic
+#[tauri::command]
+fn rw(name: String, password: String, mnemonic: String, state: State<StateContent>) -> Result<(), String> {
+    match recover_wallet(name.clone(), password, mnemonic) {
+        Ok(wallet) => {
+            add_wallet_state(name, wallet, state);
+            Ok(())
+        }
+        Err(err) => Err(err.to_string()),
+    }
+}
+
+#[tauri::command]
+fn rw_shamir(name: String, password: String, mnemonics: Vec<Vec<String>>, state: State<StateContent>) -> Result<(), String> {
+    match recover_wallet_shamir(name.clone(), password, mnemonics) {
+        Ok(wallet) => {
+            add_wallet_state(name, wallet, state);
             Ok(())
         }
         Err(err) => Err(err.to_string()),
@@ -100,11 +140,13 @@ fn get_wallet_data(name: String, state: State<StateContent>) -> Result<WalletDat
                     sender_address: "TODO:".to_string(),
                     sent: tx.sent,
                     received: tx.received,
-                    timestamp: tx.confirmation_time.as_ref().unwrap().timestamp,
+                    timestamp: match &tx.confirmation_time {
+                        Some(ct) => ct.timestamp,
+                        None => 0,
+                    }
                 })
                 .collect(),
         })
-
     })
 }
 
@@ -123,25 +165,22 @@ fn close_wallet(name: String, state: State<StateContent>) {
     wallets.remove(index_to_remove);
 }
 
-
 #[tauri::command]
 fn delete_wallet(name: String, state: State<StateContent>) {
     db::delete_wallet(name.clone()).unwrap();
     close_wallet(name, state);
 }
 
-fn with_wallet<F, R>(name: &String, state: State<StateContent>, callback: F) -> R 
-    where
-    F: FnOnce(&MyWallet) -> R
+fn add_wallet_state(name: String, wallet: MyWallet, state: State<StateContent>) {
+    let mut wallets = state.lock().unwrap();
+    wallets.push((name, Mutex::new(wallet)));
+}
+
+fn with_wallet<F, R>(name: &String, state: State<StateContent>, callback: F) -> R
+where
+    F: FnOnce(&MyWallet) -> R,
 {
     let wallets = state.lock().unwrap();
-    wallets.iter().for_each(|(n, _)| {
-        println!("'{}' == '{}' -> {}", name, n, n.eq(name));
-    });
-    dbg!(wallets
-        .iter()
-        .find(|(n, _)| n.eq(name))
-);
     let wallet = wallets
         .iter()
         .find(|(n, _)| n.eq(name))
