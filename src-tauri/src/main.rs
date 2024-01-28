@@ -25,8 +25,8 @@ fn main() -> ExitCode {
     tauri::Builder::default()
         .setup(|app| {
             handle_gui_cli(app);
-            let window = app.get_window("main").unwrap();
-            window.open_devtools();
+            // let window = app.get_window("main").unwrap();
+            // window.open_devtools();
             Ok(())
         })
         .manage::<StateContent>(Mutex::new(vec![]))
@@ -61,7 +61,7 @@ fn cw(name: String, password: String, state: State<StateContent>) -> Result<Stri
 }
 
 #[tauri::command]
-fn cw_shamir(name: String, password: String, treshold: u8, count: u8, state: State<StateContent>) -> Result<Vec<Vec<String>>, String> {
+fn cw_shamir(name: String, password: String, treshold: u8, count: u8, state: State<StateContent>) -> Result<Vec<String>, String> {
     match create_wallet(name.clone(), password) {
         Ok((wallet, mnemonic)) => {
             let xprv = xprv_from_mnemonic(&mnemonic);

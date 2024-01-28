@@ -3,7 +3,6 @@
     import { invoke } from "@tauri-apps/api";
 
     export let names: Array<String>
-    export let createNewWallet: () => void
 
     let selectedWalletName = ""
     let password = ""
@@ -17,8 +16,8 @@
 </script>
 
 
-<div class="flex flex-col items-center mb-32">
-    <h1 class="text-xl">Login to wallet</h1>
+<div class="flex flex-col mb-32 items-center">
+    <h1 class="text-xl m-3">Login to existing wallet</h1>
     <form on:submit|preventDefault={handleSubmit} class="p-4 max-w-md mx-auto space-y-5">
         <div class="mb-4">
             <label for="selectName" class="block text-sm font-bold mb-2">Select a Name</label>
@@ -53,5 +52,4 @@
             >Login to wallet</button>
         </div>
     </form>
-    <button on:click={createNewWallet}>Create new wallet</button>
 </div>

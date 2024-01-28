@@ -6,7 +6,7 @@ pub fn split(
     xprv: ExtendedPrivKey,
     treshold: u8,
     count: u8,
-) -> Result<Vec<Vec<String>>, sssmc39::Error> {
+) -> Result<Vec<String>, sssmc39::Error> {
     generate_mnemonics(
         1, // NOTE: number of groups
         &[(treshold, count)],
@@ -15,7 +15,7 @@ pub fn split(
         0,
     )
     .unwrap()[0] // the only group
-        .mnemonic_list()
+        .mnemonic_list_flat()
 }
 
 pub fn combine(mnemonics: Vec<Vec<String>>) -> ExtendedPrivKey {

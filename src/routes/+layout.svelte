@@ -60,7 +60,7 @@
     </svelte:fragment>
 
     <div
-        class="container h-full mx-auto flex flex-col justify-center items-center"
+        class="container h-full mx-auto flex flex-col items-center m-5"
     >
         <slot />
     </div>
