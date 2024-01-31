@@ -21,21 +21,29 @@ pub fn handle_onetime_cli(
         }
         Ok(matches) => {
             if contains(&matches, "list") {
-                println!("Printing wallet names: ");
-                for name in db::get_wallet_names().unwrap().iter() {
-                    println!("- {}", name);
+                match db::get_wallet_names() {
+                    Ok(wallet_names) => {
+                        println!("Printing wallet names: ");
+                        for name in wallet_names.iter() {
+                            println!("- {}", name);
+                        }
+                        return Some(0);
+                    }
+                    Err(err) => {
+                        println!("Error loading wallet names from db: {}", err);
+                        return Some(101);
+                    }
                 }
-                return Some(0);
             }
 
             if let Some(name) = get_value(&matches, "new_wallet") {
                 let password = prompt_password("Set password: ").unwrap();
 
-                 match create_wallet(name, password) {
+                match create_wallet(name, password) {
                     Ok((_wallet, mnemonic_words)) => {
                         println!("Created new wallet: {}", mnemonic_words);
                         return Some(0);
-                    } 
+                    }
                     Err(err) => {
                         println!("Error: {}", err);
                         return Some(101);
@@ -44,9 +52,9 @@ pub fn handle_onetime_cli(
             }
 
             if let Some(_name) = get_value(&matches, "recover_wallet") {
-                //TODO:
+                //TODO: this + shamir in CLI
                 todo!("recover");
-            }   
+            }
 
             if let Some(ref subcommand) = matches.subcommand {
                 if subcommand.name == "wallet" {
@@ -73,22 +81,35 @@ pub fn handle_onetime_cli(
 
                     if contains(ms, "sync") {
                         println!("Synchronizing blockchain...");
-                        wallet.synchronize();
-                        println!("-> finished");
+                        match wallet.synchronize() {
+                            Ok(_) => println!("-> finished"),
+                            Err(err) => println!("-> Error: {}", err),
+                        };
                     }
                     if contains(ms, "balance") {
-                        let balance = wallet.get_total_balance().unwrap();
-                        println!("Balance: {} sats", balance)
+                        match wallet.get_total_balance() {
+                            Ok(balance) => println!("balance: {} sats", balance),
+                            Err(err) => println!("Error loading balance: {}", err),
+                        }
                     }
                     if contains(ms, "address") {
-                        let address = wallet.last_used_address().unwrap();
-                        println!("New address: {}", address.to_string());
+                        match wallet.last_used_address() {
+                            Ok(address) => println!("New address: {}", address.to_string()),
+                            Err(err) => println!("Error loading address: {}", err),
+                        }
                     }
                     if contains(ms, "transactions") {
-                        let txs = wallet.all_txs().unwrap();
-                        println!("Listing transactions: ");
-                        for tx in txs.iter() {
-                            dbg!(tx);
+                        match wallet.all_txs() {
+                            Ok(txs) => {
+                                println!("Listing transactions: ");
+                                for tx in txs.iter() {
+                                    dbg!(tx);
+                                }
+                            }
+                            Err(err) => {
+                                println!("Error loading transactions: {}", err);
+                                return Some(102);
+                            }
                         }
                     }
 
@@ -96,11 +117,25 @@ pub fn handle_onetime_cli(
                         if subcommand.name == "send" {
                             let ms2 = &subcommand.matches;
                             let send_to = get_value(ms2, "recipient").unwrap();
-                            let amount = get_value(ms2, "amount").unwrap().parse::<u64>().unwrap();
+                            let amount = match get_value(ms2, "amount").unwrap().parse::<u64>() {
+                                Ok(amount) => amount,
+                                Err(_) => {
+                                    println!("Not a correct integer value for amount");
+                                    return Some(103);
+                                }
+                            };
 
                             println!("{} {}", send_to, amount);
-                            println!("signer count {}", wallet.get_signers(KeychainKind::External).signers().len());
-                            wallet.send(send_to, amount);
+                            println!(
+                                "signer count {}",
+                                wallet.get_signers(KeychainKind::External).signers().len()
+                            );
+
+                            // TODO: add feerate
+                            match wallet.send(send_to, amount, 10.0) {
+                                Ok(_) => println!("-> Successfuly broadcasted transaction"),
+                                Err(err) => println!("-> Error sending tx: {}", err),
+                            };
                         }
                     }
 

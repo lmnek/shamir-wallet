@@ -198,6 +198,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-cli",
+ "thiserror",
 ]
 
 [[package]]

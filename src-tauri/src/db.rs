@@ -3,21 +3,22 @@
 use std::str::FromStr;
 
 use crate::wallet::{MyWallet, self, init_wallet};
-use anyhow::anyhow;
+use anyhow::{anyhow, Context, Result};
 use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 use orion::{aead, kdf, pwhash, util, kex::SecretKey};
 use sled::{Db, Tree};
 use tauri::api::path;
 
-fn sled_db() -> Db {
-    let data_path = path::data_dir().unwrap();
+fn sled_db() -> Result<Db> {
+    let data_path = path::data_dir().context("Can't access systems data directory")?;
     let db_path = data_path.join("shamir_wallet").join("wallets_info.db");
-    sled::open(&db_path).unwrap()
+    let db = sled::open(&db_path)?;
+    Ok(db)
 }
 
 // PERF: async / look at bottlenecks
-pub fn save_private_key(name: &String, password: &String, xprv: ExtendedPrivKey) -> anyhow::Result<()> {
-    let db = sled_db();
+pub fn save_private_key(name: &String, password: &String, xprv: ExtendedPrivKey) -> Result<()> {
+    let db = sled_db()?;
     let tree = db.open_tree(name)?;
 
     let passw = pwhash::Password::from_slice(password.as_bytes())?;
@@ -35,22 +36,22 @@ pub fn save_private_key(name: &String, password: &String, xprv: ExtendedPrivKey)
     Ok(())
 }
 
-pub fn retrieve_wallet(name: &String, password: &String) -> anyhow::Result<MyWallet> {
-    let db = sled_db();
+pub fn retrieve_wallet(name: &String, password: &String) -> Result<MyWallet> {
+    let db = sled_db()?;
     let tree = db.open_tree(&name)?;
     let derived_key = derive_encryption_key(password, &tree)?;
 
     // retrive and decrypt private key
-    let enc_private_key = tree.get(b"private_key_wif")?.unwrap();
+    let enc_private_key = tree.get(b"private_key_wif")?.context("Private key now saved in DB")?;
     let private_key_str = &String::from_utf8(aead::open(&derived_key, &enc_private_key)?)?;
     let xprv = ExtendedPrivKey::from_str(private_key_str)?;
 
-    let wallet = init_wallet(&name, xprv);
+    let wallet = init_wallet(&name, xprv)?;
     Ok(wallet)
 }
 
-pub fn get_wallet_names() -> anyhow::Result<Vec<String>>{
-    let db = sled_db();
+pub fn get_wallet_names() -> Result<Vec<String>>{
+    let db = sled_db()?;
     let mut keys = Vec::new();
     for key in db.tree_names() {
         let key_string = std::str::from_utf8(&key)?.to_string();
@@ -60,24 +61,24 @@ pub fn get_wallet_names() -> anyhow::Result<Vec<String>>{
     Ok(keys)
 }
 
-pub fn delete_wallet(name: String) -> anyhow::Result<bool> {
+pub fn delete_wallet(name: String) -> Result<bool> {
     wallet::delete_wallet_db(&name)?;
-    let db = sled_db();
+    let db = sled_db()?;
     Ok(!db.drop_tree(name.as_bytes())?) 
 }
 
 
-fn derive_encryption_key(password: &String, wallet_tree: &Tree) -> anyhow::Result<SecretKey> {
+fn derive_encryption_key(password: &String, wallet_tree: &Tree) -> Result<SecretKey> {
     // verify password with hash in DB
     let passw = pwhash::Password::from_slice(password.as_bytes())?;
-    let stored_hash = wallet_tree.get(b"password_hash")?.unwrap();
+    let stored_hash = wallet_tree.get(b"password_hash")?.context("Password hash not saved in the DB")?;
     let hash = pwhash::PasswordHash::from_encoded(std::str::from_utf8(&stored_hash)?)?;
     if !pwhash::hash_password_verify(&hash, &passw).is_ok() {
         return Err(anyhow!("Wrong password"));
     }
 
     // derive decryption key from password
-    let salt_bytes = wallet_tree.get(b"enc_salt")?.unwrap().to_vec();
+    let salt_bytes = wallet_tree.get(b"enc_salt")?.context("Password hash not saved in the DB")?.to_vec();
     let salt = kdf::Salt::from_slice(&salt_bytes)?;
     let derived_key = kdf::derive_key(&passw, &salt, 3, 1 << 16, 32)?;
     Ok(derived_key)
