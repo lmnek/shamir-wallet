@@ -9,8 +9,10 @@
     } from "@fortawesome/free-solid-svg-icons";
     import { faGithub } from "@fortawesome/free-brands-svg-icons";
     import { open } from "@tauri-apps/api/shell";
-    import { getDrawerStore } from "@skeletonlabs/skeleton";
+    import { getDrawerStore, getToastStore } from "@skeletonlabs/skeleton";
+    import showErrorToast from "$lib/ErrorToast";
     const drawerStore = getDrawerStore();
+    const toastStore = getToastStore();
 
     $: getIconColor = (walletName: string) =>
         $page.url.pathname.startsWith("/wallet/" + walletName)
@@ -31,10 +33,10 @@
                     <span class="badge bg-secondary-500 aspect-square">
                         <Fa icon={faHome} size="1.6x" />
                     </span>
-                    <span class="flex-auto text-xl">Login to wallet</span>
+                    <span class="flex-auto text-xl">Login</span>
                 </a>
             </li>
-            <hr class="!border-t-4" />
+            <div class="py-3"><hr class="!border-t-4" /></div>
             {#each $walletsNamesStore as wallet (wallet)}
                 <li>
                     <a href="/wallet/{wallet}" on:click={drawerClose}>
@@ -52,8 +54,15 @@
         </ul>
     </div>
     <div>
-        <hr class="!border-t-4" />
-        <a href="/login" on:click={drawerClose}>
+        <div class="py-3"><hr class="!border-t-4" /></div>
+        <a
+            href="/"
+            on:click|preventDefault={() => {
+                // TODO: settings ? 
+                drawerClose();
+                showErrorToast("Not implemented :D", toastStore);
+            }}
+        >
             <span class="badge bg-secondary-500 aspect-square">
                 <Fa icon={faGear} size="2x" />
             </span>

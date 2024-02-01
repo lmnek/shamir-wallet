@@ -14,7 +14,8 @@ pub fn handle_onetime_cli(
     context: &tauri::Context<EmbeddedAssets>,
 ) -> Option<u8> {
     match handle_cli(context) {
-        Ok(_) => Some(0),
+        Ok(false) => None,
+        Ok(true) => Some(0),
         Err(err) => {
             eprintln!("Error: {}", err);
             Some(100)
@@ -24,7 +25,7 @@ pub fn handle_onetime_cli(
 
 pub fn handle_cli(
     context: &tauri::Context<EmbeddedAssets>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     let matches = tauri::api::cli::get_matches(
         &context.config().tauri.cli.clone().unwrap(),
         context.package_info(),
@@ -42,10 +43,10 @@ pub fn handle_cli(
                 for name in wallet_names.iter() {
                     println!("- {}", name);
                 }
-                return Ok(())
+                return Ok(true)
             }
 
-            dbg!(&matches);
+            //dbg!(&matches);
 
             if let Some(ref subcommand) = matches.subcommand {
                 let ms = &subcommand.matches;
@@ -152,10 +153,11 @@ pub fn handle_cli(
                         return Err(anyhow!("Unknown subcommand"))
                     }
                 }
+                return Ok(true)
             }
         }
     }
-    return Ok(());
+    return Ok(false);
 }
 
 // Entry arguments for running GUI app

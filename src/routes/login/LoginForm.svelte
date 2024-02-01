@@ -57,9 +57,3 @@
         <LoadingButton text="Login to wallet" onClick={handleSubmit} />
     </form>
 </div>
-
-<style>
-    .option-custom {
-        background-color: red;
-    }
-</style>

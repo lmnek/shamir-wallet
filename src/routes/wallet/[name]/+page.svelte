@@ -15,6 +15,15 @@
         type ToastSettings,
     } from "@skeletonlabs/skeleton";
     import LoadingButton from "$lib/LoadingButton.svelte";
+    import Fa from "svelte-fa";
+    import {
+    faArrowUpFromBracket,
+        faRotate,
+        faTable,
+        faTableList,
+        faTrash,
+        faXmark,
+    } from "@fortawesome/free-solid-svg-icons";
     const toastStore: ToastStore = getToastStore();
     const modalStore = getModalStore();
 
@@ -53,10 +62,14 @@
                 wallets.map((w) => (w.name === walletName ? dt : w)),
             );
         }
+        const settings: ToastSettings = {
+            message: "Blockchain synchronization completed",
+            background: "variant-filled-success",
+        };
+        toastStore.trigger(settings);
         let getDt = async () => dt;
         walletDataPromise = getDt();
     }
-    // TODO: add icons
 
     async function onDelete() {
         let name = walletName;
@@ -116,12 +129,14 @@
 {:then walletData}
     <div class="flex flex-grow justify-between items-center w-full mx-3 mt-4">
         <div class="flex w-1/3 space-x-3">
-            <button class="btn variant-ghost-secondary" on:click={onClose}
-                >Close</button
-            >
-            <button class="btn variant-soft-secondary" on:click={onDelete}
-                >Delete wallet</button
-            >
+            <button class="btn variant-ghost-secondary" on:click={onClose}>
+                <Fa icon={faXmark} size="1.2x" />
+                <p>Close</p>
+            </button>
+            <button class="btn variant-soft-secondary" on:click={onDelete}>
+                <Fa icon={faTrash} size="1x" />
+                <p>Delete</p>
+            </button>
         </div>
         <h1 class="text-center h3 w-1/3 font-bold text-primary-500">
             {walletData.name}
@@ -132,6 +147,7 @@
                 onClick={onSynchronize}
                 color="variant-filled-secondary"
                 meter="stroke-primary-50"
+                icon={faRotate}
             />
         </div>
     </div>
@@ -145,13 +161,18 @@
         </div>
         <button
             class="btn variant-filled-primary font-bold"
-            on:click={() => goto($page.url.pathname + "/send")}>Send</button
+            on:click={() => goto($page.url.pathname + "/send")}
         >
+            <Fa icon={faArrowUpFromBracket} size="1.3x" />
+            <p>Send</p>
+        </button>
         <button
             class="btn variant-filled-primary font-bold"
             on:click={() => goto($page.url.pathname + "/transactions")}
-            >Transactions</button
         >
+            <Fa icon={faTableList} size="1.3x" />
+            <p>Transactions</p>
+        </button>
     </div>
 {:catch error}
     <h2>Error: {error}</h2>
