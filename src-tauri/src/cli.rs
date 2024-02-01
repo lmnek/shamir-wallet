@@ -116,6 +116,7 @@ pub fn handle_onetime_cli(
                     if let Some(ref subcommand) = ms.subcommand {
                         if subcommand.name == "send" {
                             let ms2 = &subcommand.matches;
+                            // Tauri.conf makes sure that args are present -> "required"
                             let send_to = get_value(ms2, "recipient").unwrap();
                             let amount = match get_value(ms2, "amount").unwrap().parse::<u64>() {
                                 Ok(amount) => amount,
@@ -124,15 +125,15 @@ pub fn handle_onetime_cli(
                                     return Some(103);
                                 }
                             };
+                            let fee_rate = match get_value(ms2, "fees").unwrap().parse::<f32>() {
+                                Ok(fr) => fr,
+                                Err(_) => {
+                                    println!("Not a correct float value for fee rate");
+                                    return Some(103);
+                                }
+                            };
 
-                            println!("{} {}", send_to, amount);
-                            println!(
-                                "signer count {}",
-                                wallet.get_signers(KeychainKind::External).signers().len()
-                            );
-
-                            // TODO: add feerate
-                            match wallet.send(send_to, amount, 10.0) {
+                            match wallet.send(send_to, amount, fee_rate) {
                                 Ok(_) => println!("-> Successfuly broadcasted transaction"),
                                 Err(err) => println!("-> Error sending tx: {}", err),
                             };

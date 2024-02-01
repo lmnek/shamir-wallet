@@ -1,10 +1,9 @@
 
 export interface TransactionData {
     tx_id: string;
-    senderAddress: string;
     sent: number;
     received: number;
-    timestamp: number; 
+    fee: number | null;
 }
 
 export interface WalletData {

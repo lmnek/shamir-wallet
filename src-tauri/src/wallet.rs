@@ -1,6 +1,7 @@
 use crate::db;
 use crate::shamir;
 use anyhow::Context;
+use anyhow::{anyhow, Result};
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 use bdk::bitcoin::{Network, Transaction};
@@ -20,13 +21,11 @@ use bdk::{
     wallet::AddressIndex,
 };
 use bdk::{miniscript, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
-use tauri::api::path;
 use core::f32;
 use std::path::PathBuf;
 use std::str::FromStr;
-use anyhow::{Result, anyhow};
+use tauri::api::path;
 
-static NETWORK: Network = Network::Testnet;
 
 pub type MyWallet = Wallet<SqliteDatabase>;
 
@@ -49,23 +48,20 @@ pub fn create_wallet(name: String, password: String) -> Result<(MyWallet, String
 pub fn xprv_from_mnemonic(mnemonic: &String) -> Result<ExtendedPrivKey> {
     let mnemonic = Mnemonic::parse(mnemonic)?;
     let xkey: ExtendedKey = mnemonic.into_extended_key()?;
-    let xprv = xkey.into_xprv(NETWORK).context("Can't convert private key into extended")?;
+    let xprv = xkey
+        .into_xprv(get_network())
+        .context("Can't convert private key into extended")?;
     Ok(xprv)
 }
 
-pub fn init_wallet(
-    name: &String,
-    xprv: ExtendedPrivKey
-) -> Result<MyWallet>
-{
+pub fn init_wallet(name: &String, xprv: ExtendedPrivKey) -> Result<MyWallet> {
     // Create a BDK wallet structure using BIP 84 descriptor ("m/84h/1h/0h/0" and "m/84h/1h/0h/1")
     let descriptor = Bip84(xprv, KeychainKind::External);
     let change_descriptor = Bip84(xprv, KeychainKind::Internal);
     let db = get_db(name)?;
-    let wallet = Wallet::new(descriptor, Some(change_descriptor), NETWORK, db)?;
+    let wallet = Wallet::new(descriptor, Some(change_descriptor), get_network(), db)?;
     Ok(wallet)
 }
-
 
 pub fn recover_wallet(name: String, password: String, mnemonic: String) -> Result<MyWallet> {
     let xprv = xprv_from_mnemonic(&mnemonic)?;
@@ -74,7 +70,11 @@ pub fn recover_wallet(name: String, password: String, mnemonic: String) -> Resul
     Ok(wallet)
 }
 
-pub fn recover_wallet_shamir(name: String, password: String, mnemonics: Vec<Vec<String>>) -> Result<MyWallet> {
+pub fn recover_wallet_shamir(
+    name: String,
+    password: String,
+    mnemonics: Vec<Vec<String>>,
+) -> Result<MyWallet> {
     let xprv = shamir::combine(mnemonics)?;
     let wallet = init_wallet(&name, xprv)?;
     db::save_private_key(&name, &password, xprv)?;
@@ -105,9 +105,10 @@ impl WalletInterface for MyWallet {
     }
 
     fn synchronize(&self) -> Result<()> {
-        // NOTE: SyncOptions - progress
+        // WARN: always connecting to the same electrum server
         let client = Client::new("ssl://electrum.blockstream.info:60002")?;
         let blockchain = ElectrumBlockchain::from(client);
+        // NOTE: SyncOptions - offers option to track progress while syncing
         self.sync(&blockchain, SyncOptions::default())?;
         Ok(())
     }
@@ -124,7 +125,8 @@ impl WalletInterface for MyWallet {
         fee_rate: f32,
     ) -> Result<(PartiallySignedTransaction, TransactionDetails)> {
         let dest_script = Address::from_str(send_to.as_str())
-            .map_err(|_| anyhow!("Invalid address"))?.script_pubkey();
+            .map_err(|_| anyhow!("Invalid address"))?
+            .script_pubkey();
         // psbt = partially signed transaction
         let (psbt, details) = {
             let mut builder = self.build_tx();
@@ -174,7 +176,7 @@ impl WalletInterface for MyWallet {
     }
 }
 
-pub fn delete_wallet_db(name: &String) -> Result<()>{
+pub fn delete_wallet_db(name: &String) -> Result<()> {
     let db_path = get_db_path(name)?;
     std::fs::remove_file(db_path)?;
     Ok(())
@@ -188,9 +190,16 @@ fn get_db(name: &String) -> Result<SqliteDatabase> {
 
 fn get_db_path(name: &String) -> Result<PathBuf> {
     let data_path = path::data_dir().context("Can't access systems data directory")?;
-    let db_path = data_path.join("shamir_wallet").join(format!("{}.sqlite", name));
+    let db_path = data_path
+        .join("shamir_wallet")
+        .join(format!("{}.sqlite", name));
     Ok(db_path)
 }
 
-
-
+fn get_network() -> Network {
+    if std::env::var("IS_TESTNET").expect(".env must be set") == "true".to_string() {
+        Network::Testnet
+    } else {
+        Network::Bitcoin
+    }
+}

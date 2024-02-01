@@ -24,7 +24,7 @@
     };
 </script>
 
-<div class="flex flex-col mb-32 items-center">
+<div class="flex flex-col items-center">
     <h3 class="m-3 h3">Login to existing wallet</h3>
     <form class="p-4 max-w-md mx-auto space-y-5">
         <div class="mb-4">

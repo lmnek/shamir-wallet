@@ -19,6 +19,7 @@ use wallet::{
 
 fn main() -> ExitCode {
     set_var("RUST_BACKTRACE", "1"); //NOTE: remove for production
+    dotenv::dotenv().ok();
 
     let context = tauri::generate_context!();
     if let Some(exit_code) = handle_onetime_cli(&context) {
@@ -45,7 +46,8 @@ fn main() -> ExitCode {
             send,
             fee_for_transaction,
             close_wallet,
-            delete_wallet
+            delete_wallet,
+            is_testnet
         ])
         .run(context)
         .expect("error while running tauri application");
@@ -139,16 +141,15 @@ async fn fee_for_transaction(
     })?
 }
 
+//NOTE: could return confirmation time
 #[derive(Serialize)]
 struct TransactionData {
     tx_id: String,
-    sender_address: String,
     sent: u64,
     received: u64,
-    timestamp: u64,
+    fee: Option<u64>
 }
 
-// TODO: confirmed / confirmed time
 #[derive(Serialize)]
 struct WalletData {
     name: String,
@@ -179,13 +180,9 @@ async fn get_transactions(
             .iter()
             .map(|tx| TransactionData {
                 tx_id: tx.txid.to_string(),
-                sender_address: "TODO:".to_string(),
                 sent: tx.sent,
                 received: tx.received,
-                timestamp: match &tx.confirmation_time {
-                    Some(ct) => ct.timestamp,
-                    None => 0,
-                },
+                fee: tx.fee
             })
             .collect())
     })?
@@ -205,6 +202,11 @@ async fn close_wallet(name: String, state: State<'_, StateContent>) -> CommandRe
         .ok_or("Can't close wallet")?;
     wallets.remove(index_to_remove);
     Ok(())
+}
+
+#[tauri::command]
+async fn is_testnet() -> CommandResult<bool> {
+    Ok(std::env::var("IS_TESTNET").unwrap() == "true".to_string())
 }
 
 #[tauri::command]

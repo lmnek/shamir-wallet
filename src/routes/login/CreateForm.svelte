@@ -26,15 +26,13 @@
             showErrorToast("Enter nonempty name and password", toastStore);
             return;
         }
-        // TODO: better display of mnemonics in popup
         if (!shamirOn) {
             await invoke<string>("cw", { name, password })
                 .then((mnemonic) => {
                     const modal: ModalSettings = {
-                        type: "alert",
-                        title: "Mnemonic phrase",
-                        body: "SAVE THE MNEMONIC PHRASE: " + mnemonic,
-                        buttonTextCancel: "OK",
+                        type: "component",
+                        component: "mnemonicModal",
+                        meta: { mnemonics: [mnemonic] },
                     };
                     modalStore.trigger(modal);
                     goto(`/wallet/${name}`);
@@ -49,12 +47,9 @@
             })
                 .then((mnemonics) => {
                     const modal: ModalSettings = {
-                        type: "alert",
-                        title: "Mnemonic phrase",
-                        body:
-                            "SAVE THE MNEMONIC PHRASE: " +
-                            mnemonics.map((mn) => "SHARE: " + mn + "\n"),
-                        buttonTextCancel: "OK",
+                        type: "component",
+                        component: "mnemonicModal",
+                        meta: { mnemonics: mnemonics },
                     };
                     modalStore.trigger(modal);
                     goto(`/wallet/${name}`);
@@ -64,7 +59,7 @@
     };
 </script>
 
-<div class="flex flex-col mb-32 items-center">
+<div class="flex flex-col mb-5 items-center">
     <h3 class="m-3 h3">Create new wallet</h3>
     <form class="p-4 max-w-md mx-auto space-y-5">
         <div>

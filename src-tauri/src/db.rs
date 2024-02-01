@@ -16,7 +16,7 @@ fn sled_db() -> Result<Db> {
     Ok(db)
 }
 
-// PERF: async / look at bottlenecks
+// PERF: look at bottlenecks -> something takes very long
 pub fn save_private_key(name: &String, password: &String, xprv: ExtendedPrivKey) -> Result<()> {
     let db = sled_db()?;
     let tree = db.open_tree(name)?;

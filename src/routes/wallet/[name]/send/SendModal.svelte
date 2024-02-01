@@ -14,7 +14,6 @@
     $: tx_details = $modalStore[0]?.meta?.tx_details;
 
     async function onConfirm() {
-        // HACK: don't send with unnecesarry arguments
         await invoke("send", tx_details)
             .then(() => {
                 const settings: ToastSettings = {

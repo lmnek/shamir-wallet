@@ -1,11 +1,11 @@
 use bdk::bitcoin::util::bip32::ExtendedPrivKey;
-// WARNING: non-tested SSS library, still under development
+// WARN: non-tested SSS library, still under development
 use anyhow::Result;
 use sssmc39::{combine_mnemonics, generate_mnemonics};
 
 pub fn split(xprv: ExtendedPrivKey, treshold: u8, count: u8) -> Result<Vec<String>> {
     let shares = generate_mnemonics(
-        1, // NOTE: number of groups
+        1, // number of groups
         &[(treshold, count)],
         &xprv.encode(),
         "passphrase",

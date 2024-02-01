@@ -30,31 +30,22 @@
             return
         }
 
-        // TODO: delete afterwards
         const tx_details = { amount, address, feeRate, name: walletName };
-        const modal: ModalSettings = {
-            type: "component",
-            component: "sendModal",
-            meta: { tx_details, fee: 30 }
-        };
-        modalStore.trigger(modal);
-
-        //const tx_details = { amount, address, feeRate, name: walletName };
-        //await invoke<number>("fee_for_transaction", tx_details)
-        //    .then((fee) => {
-        //        const modal: ModalSettings = {
-        //            type: "component",
-        //            component: "sendModal",
-        //            meta: { tx_details, fee },
-        //        };
-        //        modalStore.trigger(modal);
-        //    })
-        //    .catch((err) => showErrorToast(err, toastStore));
+        await invoke<number>("fee_for_transaction", tx_details)
+            .then((fee) => {
+                const modal: ModalSettings = {
+                    type: "component",
+                    component: "sendModal",
+                    meta: { tx_details, fee },
+                };
+                modalStore.trigger(modal);
+            })
+            .catch((err) => showErrorToast(err, toastStore));
     }
 </script>
 
 <ButtonBack url={$page.url.pathname} />
-<h1 class="h3 mb-3">Send a transaction</h1>
+<h3 class="h3 mb-3">Send a transaction</h3>
 <form
     on:submit|preventDefault={handleSubmit}
     class="p-4 max-w-md mx-auto space-y-10"

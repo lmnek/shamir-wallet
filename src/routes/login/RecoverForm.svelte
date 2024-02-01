@@ -57,7 +57,7 @@
     };
 </script>
 
-<div class="flex flex-col mb-32 items-center">
+<div class="flex flex-col items-center mb-5">
     <h3 class="m-3 h3">Recover wallet</h3>
     <form class="p-4 max-w-md mx-auto space-y-5">
         <div>

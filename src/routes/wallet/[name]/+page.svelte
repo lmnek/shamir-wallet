@@ -9,17 +9,20 @@
     import {
         getToastStore,
         ProgressRadial,
+        type ModalSettings,
         type ToastStore,
+        getModalStore,
+        type ToastSettings,
     } from "@skeletonlabs/skeleton";
     import LoadingButton from "$lib/LoadingButton.svelte";
     const toastStore: ToastStore = getToastStore();
+    const modalStore = getModalStore();
 
     export let data: { name: string };
-    const walletName = data.name;
+    $: walletName = data.name;
+    $: walletDataPromise = initialFetch(walletName);
 
-    let walletDataPromise: Promise<WalletData> = initialWalletLoad();
-
-    async function initialWalletLoad(): Promise<WalletData> {
+    async function initialFetch(walletName: string) {
         // without subscribing
         const walletNames = get(walletsNamesStore);
         const cachedWallets = get(walletsCacheStore);
@@ -32,16 +35,16 @@
         }
         let dt = await invoke<WalletData>("get_wallet_data", {
             name: walletName,
-        })
+        });
         walletsNamesStore.update((names) => [walletName, ...names]);
         walletsCacheStore.update((wallets) => [dt, ...wallets]);
-        return dt
+        return dt;
     }
 
     async function onSynchronize() {
         let dt = await invoke<WalletData>("get_wallet_data", {
             name: walletName,
-        })
+        });
         if (!get(walletsNamesStore).includes(walletName)) {
             walletsNamesStore.update((names) => [walletName, ...names]);
             walletsCacheStore.update((wallets) => [dt, ...wallets]);
@@ -50,18 +53,39 @@
                 wallets.map((w) => (w.name === walletName ? dt : w)),
             );
         }
-        let getDt = async () => dt
-        walletDataPromise = getDt()
+        let getDt = async () => dt;
+        walletDataPromise = getDt();
     }
 
     async function onDelete() {
         let name = walletName;
-        await invoke("delete_wallet", { name }).catch((err) =>
-            showErrorToast(err, toastStore),
-        );
-        walletsNamesStore.update((ws) => ws.filter((w) => w != name));
-        walletsCacheStore.update((ws) => ws.filter((w) => w.name != name));
-        goto("/login");
+
+        const modal: ModalSettings = {
+            type: "confirm",
+            title: "Confirm deletion",
+            body: "Are you sure you wish to delete this wallet?",
+            buttonTextConfirm: "Delete",
+            response: async (confirmed: boolean) => {
+                if (confirmed) {
+                    await invoke("delete_wallet", { name }).catch((err) =>
+                        showErrorToast(err, toastStore),
+                    );
+                    walletsNamesStore.update((ws) =>
+                        ws.filter((w) => w != name),
+                    );
+                    walletsCacheStore.update((ws) =>
+                        ws.filter((w) => w.name != name),
+                    );
+                    const settings: ToastSettings = {
+                        message: "Wallet succesfully deleted",
+                        background: "variant-filled-success",
+                    };
+                    toastStore.trigger(settings);
+                    goto("/login");
+                }
+            },
+        };
+        modalStore.trigger(modal);
     }
 
     async function onClose() {

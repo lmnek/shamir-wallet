@@ -28,11 +28,11 @@
     })
 </script>
 
-<div class="h-full w-full mx-auto flex flex-col items-center">
+<div class="w-full mx-auto flex flex-col items-center">
     <TabGroup justify="justify-center mt-3">
-        <Tab bind:group={tabSet} name="login" value={0}>Login</Tab>
-        <Tab bind:group={tabSet} name="create" value={1}>Create</Tab>
-        <Tab bind:group={tabSet} name="recover" value={2}>Recover</Tab>
+        <Tab bind:group={tabSet} class="font-bold" name="login" value={0}>Login</Tab>
+        <Tab bind:group={tabSet} class="font-bold"name="create" value={1}>Create</Tab>
+        <Tab bind:group={tabSet} class="font-bold"name="recover" value={2}>Recover</Tab>
         <svelte:fragment slot="panel">
             {#if tabSet === 0}
                 <LoginForm {names} />
