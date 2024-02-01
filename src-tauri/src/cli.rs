@@ -1,13 +1,30 @@
 use crate::db;
+use crate::shamir;
 use crate::wallet::create_wallet;
+use crate::wallet::recover_wallet;
+use crate::wallet::recover_wallet_shamir;
+use crate::wallet::xprv_from_mnemonic;
 use crate::wallet::WalletInterface;
-use bdk::KeychainKind;
+use anyhow::anyhow;
 use rpassword::prompt_password;
 use tauri::api::cli::Matches;
+use tauri::utils::assets::EmbeddedAssets;
 
 pub fn handle_onetime_cli(
-    context: &tauri::Context<tauri::utils::assets::EmbeddedAssets>,
+    context: &tauri::Context<EmbeddedAssets>,
 ) -> Option<u8> {
+    match handle_cli(context) {
+        Ok(_) => Some(0),
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            Some(100)
+        }
+    }
+}
+
+pub fn handle_cli(
+    context: &tauri::Context<EmbeddedAssets>,
+) -> anyhow::Result<()> {
     let matches = tauri::api::cli::get_matches(
         &context.config().tauri.cli.clone().unwrap(),
         context.package_info(),
@@ -16,144 +33,129 @@ pub fn handle_onetime_cli(
     // CLI for one-time actions
     match matches {
         Err(err) => {
-            println!("CLI error: {}", err);
-            return Some(101);
+            return Err(anyhow!("CLI - {}", err));
         }
         Ok(matches) => {
             if contains(&matches, "list") {
-                match db::get_wallet_names() {
-                    Ok(wallet_names) => {
-                        println!("Printing wallet names: ");
-                        for name in wallet_names.iter() {
-                            println!("- {}", name);
-                        }
-                        return Some(0);
-                    }
-                    Err(err) => {
-                        println!("Error loading wallet names from db: {}", err);
-                        return Some(101);
-                    }
+                let wallet_names = db::get_wallet_names()?; 
+                println!("Printing wallet names: ");
+                for name in wallet_names.iter() {
+                    println!("- {}", name);
                 }
+                return Ok(())
             }
 
-            if let Some(name) = get_value(&matches, "new_wallet") {
-                let password = prompt_password("Set password: ").unwrap();
-
-                match create_wallet(name, password) {
-                    Ok((_wallet, mnemonic_words)) => {
-                        println!("Created new wallet: {}", mnemonic_words);
-                        return Some(0);
-                    }
-                    Err(err) => {
-                        println!("Error: {}", err);
-                        return Some(101);
-                    }
-                };
-            }
-
-            if let Some(_name) = get_value(&matches, "recover_wallet") {
-                //TODO: this + shamir in CLI
-                todo!("recover");
-            }
+            dbg!(&matches);
 
             if let Some(ref subcommand) = matches.subcommand {
-                if subcommand.name == "wallet" {
-                    let wallet_name: String = get_value(&subcommand.matches, "name").unwrap();
-                    let password = match prompt_password("Enter password: ") {
-                        Ok(pwd) => {
-                            println!("-> correct");
-                            pwd
-                        }
-                        Err(_) => {
-                            eprintln!("-> error while entering the password");
-                            return Some(101);
-                        }
-                    };
-                    let wallet = match db::retrieve_wallet(&wallet_name, &password) {
-                        Ok(w) => w,
-                        Err(err) => {
-                            eprintln!("Error while retrieving wallet: {}", err);
-                            return Some(102);
-                        }
-                    };
+                let ms = &subcommand.matches;
+                match subcommand.name.as_str() {
+                    "new" => {
+                        let wallet_name: String = get_value(ms, "name").unwrap();
+                        let password = prompt_password("enter password: ")?;
 
-                    let ms = &subcommand.matches;
+                        let (_wallet, mnemonic_words) = create_wallet(wallet_name.clone(), password.clone())?;
 
-                    if contains(ms, "sync") {
-                        println!("Synchronizing blockchain...");
-                        match wallet.synchronize() {
-                            Ok(_) => println!("-> finished"),
-                            Err(err) => println!("-> Error: {}", err),
-                        };
-                    }
-                    if contains(ms, "balance") {
-                        match wallet.get_total_balance() {
-                            Ok(balance) => println!("balance: {} sats", balance),
-                            Err(err) => println!("Error loading balance: {}", err),
-                        }
-                    }
-                    if contains(ms, "address") {
-                        match wallet.last_used_address() {
-                            Ok(address) => println!("New address: {}", address.to_string()),
-                            Err(err) => println!("Error loading address: {}", err),
-                        }
-                    }
-                    if contains(ms, "transactions") {
-                        match wallet.all_txs() {
-                            Ok(txs) => {
-                                println!("Listing transactions: ");
-                                for tx in txs.iter() {
-                                    dbg!(tx);
+                        if let Some(ref subcommand) = ms.subcommand {
+                            if subcommand.name == "shamir" {
+                                let ms2 = &subcommand.matches;
+                                let treshold = get_value(ms2, "treshold")
+                                    .unwrap()
+                                    .parse::<u8>()?;
+                                let count = get_value(ms2, "count")
+                                    .unwrap()
+                                    .parse::<u8>()?;
+                                let (_wallet, mnemonic) =
+                                    create_wallet(wallet_name.clone(), password)?;
+                                let xprv = xprv_from_mnemonic(&mnemonic)?;
+                                let shamir_mnemonic_shares = shamir::split(xprv, treshold, count)?;
+                                for share in shamir_mnemonic_shares {
+                                    println!("SHARE: ");
+                                    println!("{}", share);
                                 }
                             }
-                            Err(err) => {
-                                println!("Error loading transactions: {}", err);
-                                return Some(102);
+                        } else {
+                            println!("Created new wallet: {}", mnemonic_words);
+                        }
+                    }
+                    "recovery" => {
+                        let wallet_name: String = get_value(ms, "name").unwrap();
+                        let password = prompt_password("enter password: ")?;
+
+                        if let Some(ref subcommand) = ms.subcommand {
+                            if subcommand.name == "shamir" {
+                                let ms2 = &subcommand.matches;
+                                if let Some(_arg) = ms2.args.get("share") {
+                                    // FIX: collect shares from arguments and contruct wallet
+                                    // let shares: Value::Array = arg.value.into();
+
+                                    recover_wallet_shamir(
+                                        wallet_name.clone(),
+                                        password,
+                                        vec![],
+                                    )?;
+                                }
+                            }
+                        } else {
+                            let mnemonic: String = get_value(ms, "mnemonic").unwrap();
+                            recover_wallet(wallet_name.clone(), password, mnemonic)?;
+                        }
+                        println!("Created new wallet");
+                        println!("Warning: Clear your command line history!")
+                    }
+                    "wallet" => {
+                        let wallet_name: String = get_value(&subcommand.matches, "name").unwrap();
+                        let password = prompt_password("enter password: ")?;
+                        let wallet = db::retrieve_wallet(&wallet_name, &password)?;
+
+                        if contains(ms, "sync") {
+                            println!("Synchronizing blockchain...");
+                            wallet.synchronize()?; 
+                        }
+                        if contains(ms, "balance") {
+                            let balance = wallet.get_total_balance()?;
+                            println!("balance: {} sats", balance);
+                        }
+                        if contains(ms, "address") {
+                            let address = wallet.last_used_address()?; 
+                            println!("New address: {}", address.to_string());
+                        }
+                        if contains(ms, "transactions") {
+                            let txs = wallet.all_txs()?;
+                            println!("Listing transactions: ");
+                            for tx in txs.iter() {
+                                dbg!(tx);
                             }
                         }
-                    }
 
-                    if let Some(ref subcommand) = ms.subcommand {
-                        if subcommand.name == "send" {
-                            let ms2 = &subcommand.matches;
-                            // Tauri.conf makes sure that args are present -> "required"
-                            let send_to = get_value(ms2, "recipient").unwrap();
-                            let amount = match get_value(ms2, "amount").unwrap().parse::<u64>() {
-                                Ok(amount) => amount,
-                                Err(_) => {
-                                    println!("Not a correct integer value for amount");
-                                    return Some(103);
-                                }
-                            };
-                            let fee_rate = match get_value(ms2, "fees").unwrap().parse::<f32>() {
-                                Ok(fr) => fr,
-                                Err(_) => {
-                                    println!("Not a correct float value for fee rate");
-                                    return Some(103);
-                                }
-                            };
+                        if let Some(ref subcommand) = ms.subcommand {
+                            if subcommand.name == "send" {
+                                let ms2 = &subcommand.matches;
+                                // Tauri.conf makes sure that args are present -> "required"
+                                let send_to = get_value(ms2, "recipient").unwrap();
+                                let amount = get_value(ms2, "amount").unwrap().parse::<u64>()?;
+                                let fee_rate = get_value(ms2, "fees").unwrap().parse::<f32>()?;
 
-                            match wallet.send(send_to, amount, fee_rate) {
-                                Ok(_) => println!("-> Successfuly broadcasted transaction"),
-                                Err(err) => println!("-> Error sending tx: {}", err),
+                                wallet.send(send_to, amount, fee_rate)?;
+                                println!("-> Successfuly broadcasted transaction");
+                            }
+                        }
+
+                        if contains(ms, "delete") {
+                            match db::delete_wallet(wallet_name)? {
+                                true => println!("Wallet was deleted"),
+                                false => println!("Wallet deletion failed"),
                             };
                         }
                     }
-
-                    if contains(ms, "delete") {
-                        match db::delete_wallet(wallet_name) {
-                            Ok(true) => println!("Wallet was deleted"),
-                            Ok(false) => println!("Wallet deletion failed"),
-                            Err(err) => println!("Error when deleting wallet: {}", err.to_string()),
-                        };
+                    _ => {
+                        return Err(anyhow!("Unknown subcommand"))
                     }
-
-                    return Some(0);
                 }
             }
         }
     }
-    return None;
+    return Ok(());
 }
 
 // Entry arguments for running GUI app

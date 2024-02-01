@@ -10,7 +10,6 @@
     import { getToastStore, type ToastStore } from "@skeletonlabs/skeleton";
     const toastStore: ToastStore = getToastStore()
 
-    // HACK: used regex to parse URL, is there a cleaner way in Svelte?
     let walletName = $page.url.pathname.match("/wallet/(.*?)/")![1];
     let walletData = $walletsCacheStore.find(
         (wallet) => wallet.name === walletName,

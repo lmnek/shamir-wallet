@@ -56,6 +56,7 @@
         let getDt = async () => dt;
         walletDataPromise = getDt();
     }
+    // TODO: add icons
 
     async function onDelete() {
         let name = walletName;

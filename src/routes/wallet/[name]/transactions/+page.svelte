@@ -6,7 +6,7 @@
     import ButtonBack from "../ButtonBack.svelte";
     import Fa from "svelte-fa";
     import { faArrowUpRightFromSquare } from "@fortawesome/free-solid-svg-icons";
-    // HACK: used regex to parse URL, is there a cleaner way in Svelte?
+    // HACK: used regex to parse URL, is there a cleaner way in Svelte? (also in Send)
     let walletName = $page.url.pathname.match("/wallet/(.*?)/")![1];
 
     let transactions = invoke<TransactionData[]>("get_transactions", {

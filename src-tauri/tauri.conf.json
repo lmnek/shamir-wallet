@@ -129,27 +129,77 @@
                             ]
                         }
                     }
+                },
+                "recover": {
+                    "description": "Recover a wallet from backup seed/mnemonic",
+                    "args": [
+                        {
+                            "name": "name",
+                            "short": "n",
+                            "description": "Name new wallet",
+                            "required": true,
+                            "takesValue": true
+                        },
+                        {
+                            "name": "mnemonic",
+                            "short": "m",
+                            "description": "Recovery backup words / seed / mnemonic",
+                            "takesValue": true
+                        }
+                    ],
+                    "subcommands": {
+                        "shamir": {
+                            "description": "Recovery from Shamir backup shares",
+                            "longDescription": "Recovery from Shamir backup shares. List each share with -s flag",
+                            "args": [
+                                {
+                                    "name": "share",
+                                    "short": "s", 
+                                    "required": true,
+                                    "takesValue": true,
+                                    "multipleOccurrences": true
+                                }
+                            ]
+                        }
+                    }
+                },
+                "new": {
+                    "description": "Create new wallet",
+                    "args": [
+                        {
+                            "name": "name",
+                            "short": "n",
+                            "description": "Name new wallet",
+                            "required": true,
+                            "takesValue": true
+                        }
+                    ],
+                    "subcommands": {
+                        "shamir": {
+                            "description": "Split recovery words into shares with Shamir backup",
+                            "args": [
+                                {
+                                    "name": "treshold",
+                                    "short": "t", 
+                                    "required": true,
+                                    "takesValue": true
+                                },
+                                {
+                                    "name": "count",
+                                    "short": "c", 
+                                    "required": true,
+                                    "takesValue": true
+                                }
+                            ]
+                        }
+                    }
                 }
             },
             "args": [
                 {
-                    "name": "verbose",
-                    "short": "v",
-                    "description": "Verbose mode (does nothing lol)"
-                },
-                {
-                    "name": "new_wallet",
-                    "short": "n",
-                    "description": "Create new wallet of given name",
-                    "takesValue": true
-                },
-                {
-                    "name": "recover_wallet",
-                    "short": "r"
-                },
-                {
                     "name": "list",
-                    "short": "l"
+                    "short": "l",
+                    "description": "List all connected wallet"
                 }
             ]
         }
