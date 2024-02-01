@@ -6,41 +6,57 @@
         Modal,
         AppRail,
         AppRailAnchor,
+        type ModalComponent,
+        Toast,
     } from "@skeletonlabs/skeleton";
     import { initializeStores } from "@skeletonlabs/skeleton";
     import { walletsNamesStore } from "../Store";
     import { page } from "$app/stores";
-    initializeStores(); // for modal
+    import SendModal from "./wallet/[name]/send/SendModal.svelte";
+    import BitcoinSvg from "$lib/BitcoinSvg.svelte";
+    import Fa from 'svelte-fa'
+    import { faBars } from '@fortawesome/free-solid-svg-icons'
+
+    // For modals
+    initializeStores();
+    const modalRegistry: Record<string, ModalComponent> = {
+        sendModal: { ref: SendModal },
+    };
 
     $: wallets = $walletsNamesStore;
 </script>
 
-<Modal />
+<Modal components={modalRegistry} />
+<Toast position="br" />
 
 <AppShell>
     <svelte:fragment slot="header">
-        <AppBar>
+        <AppBar
+            gridColumns="grid-cols-3"
+            slotDefault="place-self-center"
+            slotTrail="place-content-end"
+        >
             <svelte:fragment slot="lead">
-                <strong class="text-xl uppercase">Shamir Wallet</strong>
+                <div class="flex items-center">
+                    <Fa icon={faBars} size="2x"/>
+                    <strong class="ml-5 text-2xl uppercase">Shamir Wallet</strong>
+                </div>
             </svelte:fragment>
             <svelte:fragment slot="trail">
-                <a
-                    class="btn btn-sm variant-ghost-surface"
-                    href="https://github.com/skeletonlabs/skeleton"
-                    target="_blank"
-                    rel="noreferrer"
-                >
-                    GitHub
-                </a>
+                <div class="self-center justify-self-center">
+                    <BitcoinSvg size={50}/>
+                </div>
             </svelte:fragment>
         </AppBar>
     </svelte:fragment>
 
     <svelte:fragment slot="sidebarLeft">
-        <AppRail>
+        <AppRail background="bg-surface-500">
             <svelte:fragment slot="lead">
-                <AppRailAnchor href="/" selected={$page.url.pathname === "/"}
-                    >Home</AppRailAnchor
+                <AppRailAnchor
+                    href="/login"
+                    selected={$page.url.pathname === "/login"}
+                    >Open wallet</AppRailAnchor
                 >
             </svelte:fragment>
             {#each wallets as wallet (wallet)}
@@ -58,10 +74,5 @@
             </svelte:fragment>
         </AppRail>
     </svelte:fragment>
-
-    <div
-        class="container h-full mx-auto flex flex-col items-center m-5"
-    >
-        <slot />
-    </div>
+    <slot />
 </AppShell>

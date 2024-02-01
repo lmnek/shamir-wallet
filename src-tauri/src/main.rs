@@ -56,19 +56,19 @@ type StateContent = Mutex<Vec<(String, Mutex<MyWallet>)>>;
 
 // Create wallet and return mnemonic
 #[tauri::command]
-fn cw(name: String, password: String, state: State<StateContent>) -> CommandResult<String> {
+async fn cw(name: String, password: String, state: State<'_, StateContent>) -> CommandResult<String> {
     let (wallet, mnemonic_words) = create_wallet(name.clone(), password)?;
     add_wallet_state(name, wallet, state);
     Ok(mnemonic_words)
 }
 
 #[tauri::command]
-fn cw_shamir(
+async fn cw_shamir(
     name: String,
     password: String,
     treshold: u8,
     count: u8,
-    state: State<StateContent>,
+    state: State<'_, StateContent>,
 ) -> CommandResult<Vec<String>> {
     let (wallet, mnemonic) = create_wallet(name.clone(), password)?;
     let xprv = xprv_from_mnemonic(&mnemonic)?;
@@ -79,7 +79,7 @@ fn cw_shamir(
 }
 
 #[tauri::command]
-fn load_wallet(name: String, password: String, state: State<StateContent>) -> CommandResult<()> {
+async fn load_wallet(name: String, password: String, state: State<'_, StateContent>) -> CommandResult<()> {
     let wallet = db::retrieve_wallet(&name, &password)?;
     add_wallet_state(name, wallet, state);
     Ok(())
@@ -87,11 +87,11 @@ fn load_wallet(name: String, password: String, state: State<StateContent>) -> Co
 
 // Retrive wallet from mnemonic
 #[tauri::command]
-fn rw(
+async fn rw(
     name: String,
     password: String,
     mnemonic: String,
-    state: State<StateContent>,
+    state: State<'_, StateContent>,
 ) -> CommandResult<()> {
     let wallet = recover_wallet(name.clone(), password, mnemonic)?;
     add_wallet_state(name, wallet, state);
@@ -99,11 +99,11 @@ fn rw(
 }
 
 #[tauri::command]
-fn rw_shamir(
+async fn rw_shamir(
     name: String,
     password: String,
     mnemonics: Vec<Vec<String>>,
-    state: State<StateContent>,
+    state: State<'_, StateContent>,
 ) -> CommandResult<()> {
     let wallet = recover_wallet_shamir(name.clone(), password, mnemonics)?;
     add_wallet_state(name, wallet, state);
@@ -111,12 +111,12 @@ fn rw_shamir(
 }
 
 #[tauri::command]
-fn send(
+async fn send(
     name: String,
     amount: u64,
     address: String,
     fee_rate: f32,
-    state: State<StateContent>,
+    state: State<'_, StateContent>,
 ) -> CommandResult<()> {
     with_wallet(&name, state, |wallet| {
         wallet.send(address, amount, fee_rate)?;
@@ -125,12 +125,12 @@ fn send(
 }
 
 #[tauri::command]
-fn fee_for_transaction(
+async fn fee_for_transaction(
     name: String,
     amount: u64,
     address: String,
     fee_rate: f32,
-    state: State<StateContent>,
+    state: State<'_, StateContent>,
 ) -> CommandResult<u64> {
     with_wallet(&name, state, |wallet| {
         let (_pbst, details) = wallet.create_tx(address, amount, fee_rate)?;
@@ -157,7 +157,7 @@ struct WalletData {
 }
 
 #[tauri::command]
-fn get_wallet_data(name: String, state: State<StateContent>) -> CommandResult<WalletData> {
+async fn get_wallet_data(name: String, state: State<'_, StateContent>) -> CommandResult<WalletData> {
     with_wallet(&name, state, |wallet| {
         wallet.synchronize()?;
         Ok(WalletData {
@@ -169,9 +169,9 @@ fn get_wallet_data(name: String, state: State<StateContent>) -> CommandResult<Wa
 }
 
 #[tauri::command]
-fn get_transactions(
+async fn get_transactions(
     name: String,
-    state: State<StateContent>,
+    state: State<'_, StateContent>,
 ) -> CommandResult<Vec<TransactionData>> {
     with_wallet(&name, state, |wallet| {
         Ok(wallet
@@ -192,12 +192,12 @@ fn get_transactions(
 }
 
 #[tauri::command]
-fn get_wallet_names() -> CommandResult<Vec<String>> {
+async fn get_wallet_names() -> CommandResult<Vec<String>> {
     Ok(db::get_wallet_names()?)
 }
 
 #[tauri::command]
-fn close_wallet(name: String, state: State<StateContent>) -> CommandResult<()> {
+async fn close_wallet(name: String, state: State<'_, StateContent>) -> CommandResult<()> {
     let mut wallets = state.lock().unwrap();
     let index_to_remove = wallets
         .iter()
@@ -208,13 +208,13 @@ fn close_wallet(name: String, state: State<StateContent>) -> CommandResult<()> {
 }
 
 #[tauri::command]
-fn delete_wallet(name: String, state: State<StateContent>) -> CommandResult<()> {
+async fn delete_wallet(name: String, state: State<'_, StateContent>) -> CommandResult<()> {
     db::delete_wallet(name.clone())?;
-    close_wallet(name, state)?;
+    close_wallet(name, state).await?;
     Ok(())
 }
 
-fn add_wallet_state(name: String, wallet: MyWallet, state: State<StateContent>) {
+fn add_wallet_state(name: String, wallet: MyWallet, state: State<'_, StateContent>) {
     let mut wallets = state.lock().unwrap();
     wallets.push((name, Mutex::new(wallet)));
 }

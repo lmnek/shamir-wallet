@@ -2,6 +2,7 @@ import { join } from 'path'
 import type { Config } from 'tailwindcss'
 import { skeleton } from '@skeletonlabs/tw-plugin'
 import forms from '@tailwindcss/forms';
+import { bitcoinTheme } from './bitcoin-theme';
 
 export default {
 	darkMode: 'class',
@@ -12,6 +13,7 @@ export default {
 	plugins: [
 		skeleton({
 			themes: {
+                custom: [ bitcoinTheme ],
 				preset: [
 					{
 						name: 'skeleton',

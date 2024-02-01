@@ -1,30 +1,40 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { invoke } from "@tauri-apps/api";
+    import showErrorToast from "$lib/ErrorToast";
+    import { getToastStore, type ToastStore } from "@skeletonlabs/skeleton";
+    import LoadingButton from "$lib/LoadingButton.svelte";
+    const toastStore: ToastStore = getToastStore();
 
-    export let names: Array<String>
+    export let names: Array<String>;
 
-    let selectedWalletName = ""
-    let password = ""
-    let error = ""
+    let selectedWalletName = "";
+    let password = "";
 
     let handleSubmit = async () => {
+        if (password == "") {
+            showErrorToast("Password cannot be empty", toastStore);
+            return;
+        }
         await invoke("load_wallet", { name: selectedWalletName, password })
-        .then(() => goto(`/wallet/${selectedWalletName}`))
-        .catch((err) => error = err)
-    }
+            .then(() => goto(`/wallet/${selectedWalletName}`))
+            .catch((err) => {
+                showErrorToast(err, toastStore);
+            });
+    };
 </script>
 
-
 <div class="flex flex-col mb-32 items-center">
-    <h1 class="text-xl m-3">Login to existing wallet</h1>
-    <form on:submit|preventDefault={handleSubmit} class="p-4 max-w-md mx-auto space-y-5">
+    <h3 class="m-3 h3">Login to existing wallet</h3>
+    <form class="p-4 max-w-md mx-auto space-y-5">
         <div class="mb-4">
-            <label for="selectName" class="block text-sm font-bold mb-2">Select a Name</label>
+            <label for="selectName" class="block text-sm font-bold mb-2"
+                >Name</label
+            >
             <select
                 id="selectName"
                 bind:value={selectedWalletName}
-                class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                class="select"
             >
                 <option value="" disabled>Select wallet</option>
                 {#each names as name}
@@ -33,23 +43,23 @@
             </select>
         </div>
         <div>
-            <label for="password" class="label block text-sm font-bold mb-2">Password</label>
-            <input 
-                type="password" 
-                id="password" 
-                bind:value={password} 
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" 
+            <label for="password" class="label block text-sm font-bold mb-2"
+                >Password</label
+            >
+            <input
+                type="password"
+                id="password"
+                bind:value={password}
+                class="input"
                 placeholder="******************"
             />
         </div>
-        <div class="flex flex-col justify-center">
-            {#if error != ""}
-                <p>{error}</p>
-            {/if}
-            <button 
-                class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
-                type="submit"
-            >Login to wallet</button>
-        </div>
+        <LoadingButton text="Login to wallet" onClick={handleSubmit} />
     </form>
 </div>
+
+<style>
+    .option-custom {
+        background-color: red;
+    }
+</style>

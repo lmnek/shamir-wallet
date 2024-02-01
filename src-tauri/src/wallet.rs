@@ -123,7 +123,8 @@ impl WalletInterface for MyWallet {
         amount: u64,
         fee_rate: f32,
     ) -> Result<(PartiallySignedTransaction, TransactionDetails)> {
-        let dest_script = Address::from_str(send_to.as_str())?.script_pubkey();
+        let dest_script = Address::from_str(send_to.as_str())
+            .map_err(|_| anyhow!("Invalid address"))?.script_pubkey();
         // psbt = partially signed transaction
         let (psbt, details) = {
             let mut builder = self.build_tx();

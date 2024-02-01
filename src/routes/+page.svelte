@@ -1,21 +1,16 @@
 <script lang="ts">
-    import { invoke } from '@tauri-apps/api';
-    
-    let words = "";
-
+    import { goto } from '$app/navigation';
     async function handleClick() {
-        words = await invoke("cw")
+        goto("/login")
     }
 </script>
 
-<div class="container h-full mx-auto flex justify-center items-center">
-	<div class="space-y-10 text-center flex flex-col items-center">
-		<h2 class="h2">Welcome to Shamir.</h2>
-        <a href="/login">Login</a>
-        <button class="btn variant-filled" on:click={handleClick}>
-            Create wallet
+<div class="container h-full mx-auto flex justify-center mt-36">
+	<div class="space-y-10 flex flex-col items-center">
+		<h2 class="h2 text-center">Welcome to the Shamir Wallet</h2>
+        <button class="btn variant-filled-primary" on:click={handleClick}>
+            Continue
         </button>
-        <p>{words}</p>
 	</div>
 </div>
 
