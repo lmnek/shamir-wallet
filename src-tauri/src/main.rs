@@ -29,8 +29,9 @@ fn main() -> ExitCode {
     tauri::Builder::default()
         .setup(|app| {
             handle_gui_cli(app);
-            let window = app.get_window("main").unwrap();
-            window.open_devtools();
+            // NOTE: remove for production
+            //let window = app.get_window("main").unwrap();
+            //window.open_devtools();
             Ok(())
         })
         .manage::<StateContent>(Mutex::new(vec![]))
